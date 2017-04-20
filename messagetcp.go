@@ -12,7 +12,7 @@ const (
 	TCP_MESSAGE_LEN13_BASE = 13
 	TCP_MESSAGE_LEN14_BASE = 269
 	TCP_MESSAGE_LEN15_BASE = 65805
-	TCP_MESSAGE_MAX_LEN    = 4295033101
+	TCP_MESSAGE_MAX_LEN    = 0x7fff0000 // Large number that works in 32-bit builds.
 )
 
 // TcpMessage is a CoAP Message that can encode itself for TCP
