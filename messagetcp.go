@@ -61,7 +61,7 @@ func (m *TcpMessage) MarshalBinary() ([]byte, error) {
 	var lenNib uint8
 	var extLenBytes []byte
 
-	if buf.Len() < TCP_MESSAGE_LEN14_BASE {
+	if buf.Len() < TCP_MESSAGE_LEN13_BASE {
 		lenNib = uint8(buf.Len())
 	} else if buf.Len() < TCP_MESSAGE_LEN14_BASE {
 		lenNib = 13
