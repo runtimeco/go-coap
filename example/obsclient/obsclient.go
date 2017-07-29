@@ -8,7 +8,7 @@ import (
 
 func main() {
 
-	req := coap.Message{
+	req := coap.MessageBase{
 		Type:      coap.NonConfirmable,
 		Code:      coap.GET,
 		MessageID: 12345,

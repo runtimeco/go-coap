@@ -18,7 +18,7 @@ func startUDPLisenter(t *testing.T) (*net.UDPConn, string) {
 	return udpListener, coapServerAddr
 }
 
-func dialAndSend(t *testing.T, addr string, req Message) *Message {
+func dialAndSend(t *testing.T, addr string, req Message) Message {
 	c, err := Dial("udp", addr)
 	if err != nil {
 		t.Fatalf("Error dialing: %v", err)
@@ -31,27 +31,31 @@ func dialAndSend(t *testing.T, addr string, req Message) *Message {
 }
 
 func TestServeWithAckResponse(t *testing.T) {
-	req := Message{
-		Type:      Confirmable,
-		Code:      POST,
-		MessageID: 9876,
-		Payload:   []byte("Content sent by client"),
+	req := &DgramMessage{
+		MessageBase{
+			typ:       Confirmable,
+			code:      POST,
+			messageID: 9876,
+			payload:   []byte("Content sent by client"),
+		},
 	}
 	req.SetOption(ContentFormat, TextPlain)
 	req.SetPathString("/req/path")
 
-	res := Message{
-		Type:      Acknowledgement,
-		Code:      Content,
-		MessageID: req.MessageID,
-		Payload:   []byte("Reply from CoAP server"),
+	res := &DgramMessage{
+		MessageBase{
+			typ:       Acknowledgement,
+			code:      Content,
+			messageID: req.MessageID(),
+			payload:   []byte("Reply from CoAP server"),
+		},
 	}
 	res.SetOption(ContentFormat, TextPlain)
 	res.SetPath(req.Path())
 
-	handler := FuncHandler(func(l *net.UDPConn, a *net.UDPAddr, m *Message) *Message {
-		assertEqualMessages(t, req, *m)
-		return &res
+	handler := FuncHandler(func(l *net.UDPConn, a *net.UDPAddr, m Message) Message {
+		assertEqualMessages(t, req, m)
+		return res
 	})
 
 	udpListener, coapServerAddr := startUDPLisenter(t)
@@ -62,20 +66,22 @@ func TestServeWithAckResponse(t *testing.T) {
 	if m == nil {
 		t.Fatalf("Didn't receive CoAP response")
 	}
-	assertEqualMessages(t, res, *m)
+	assertEqualMessages(t, res, m)
 }
 
 func TestServeWithoutAckResponse(t *testing.T) {
-	req := Message{
-		Type:      NonConfirmable,
-		Code:      POST,
-		MessageID: 54321,
-		Payload:   []byte("Content sent by client"),
+	req := &DgramMessage{
+		MessageBase{
+			typ:       NonConfirmable,
+			code:      POST,
+			messageID: 54321,
+			payload:   []byte("Content sent by client"),
+		},
 	}
 	req.SetOption(ContentFormat, AppOctets)
 
-	handler := FuncHandler(func(l *net.UDPConn, a *net.UDPAddr, m *Message) *Message {
-		assertEqualMessages(t, req, *m)
+	handler := FuncHandler(func(l *net.UDPConn, a *net.UDPAddr, m Message) Message {
+		assertEqualMessages(t, req, m)
 		return nil
 	})
 

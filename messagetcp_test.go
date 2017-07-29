@@ -21,14 +21,14 @@ func TestTCPDecodeMessageSmallWithPayload(t *testing.T) {
 		t.Fatalf("Error parsing message: %v", err)
 	}
 
-	if msg.Type != Confirmable {
-		t.Errorf("Expected message type confirmable, got %v", msg.Type)
+	if msg.Type() != Confirmable {
+		t.Errorf("Expected message type confirmable, got %v", msg.Type())
 	}
-	if msg.Code != GET {
-		t.Errorf("Expected message code GET, got %v", msg.Code)
+	if msg.Code() != GET {
+		t.Errorf("Expected message code GET, got %v", msg.Code())
 	}
 
-	if !bytes.Equal(msg.Payload, []byte("hi")) {
-		t.Errorf("Incorrect payload: %q", msg.Payload)
+	if !bytes.Equal(msg.Payload(), []byte("hi")) {
+		t.Errorf("Incorrect payload: %q", msg.Payload())
 	}
 }

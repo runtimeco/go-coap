@@ -9,47 +9,47 @@ import (
 )
 
 var (
-	_ = encoding.BinaryMarshaler(&Message{})
-	_ = encoding.BinaryUnmarshaler(&Message{})
+	_ = encoding.BinaryMarshaler(&DgramMessage{})
+	_ = encoding.BinaryUnmarshaler(&DgramMessage{})
 )
 
 // assertEqualMessages compares the e(xptected) message to the a(ctual) message
 // and reports any diffs with t.Errorf.
 func assertEqualMessages(t *testing.T, e, a Message) {
-	if e.Type != a.Type {
-		t.Errorf("Expected type %v, got %v", e.Type, a.Type)
+	if e.Type() != a.Type() {
+		t.Errorf("Expected type %v, got %v", e.Type(), a.Type())
 	}
-	if e.Code != a.Code {
-		t.Errorf("Expected code %v, got %v", e.Code, a.Code)
+	if e.Code() != a.Code() {
+		t.Errorf("Expected code %v, got %v", e.Code(), a.Code())
 	}
-	if e.MessageID != a.MessageID {
-		t.Errorf("Expected MessageID %v, got %v", e.MessageID, a.MessageID)
+	if e.MessageID() != a.MessageID() {
+		t.Errorf("Expected MessageID %v, got %v", e.MessageID(), a.MessageID())
 	}
-	if !bytes.Equal(e.Token, a.Token) {
-		t.Errorf("Expected token %#v, got %#v", e.Token, a.Token)
+	if !bytes.Equal(e.Token(), a.Token()) {
+		t.Errorf("Expected token %#v, got %#v", e.Token(), a.Token())
 	}
-	if !bytes.Equal(e.Payload, a.Payload) {
-		t.Errorf("Expected payload %#v, got %#v", e.Payload, a.Payload)
+	if !bytes.Equal(e.Payload(), a.Payload()) {
+		t.Errorf("Expected payload %#v, got %#v", e.Payload(), a.Payload())
 	}
 
-	if len(e.opts) != len(a.opts) {
-		t.Errorf("Expected %v options, got %v", len(e.opts), len(a.opts))
+	if len(e.AllOptions()) != len(a.AllOptions()) {
+		t.Errorf("Expected %v options, got %v", len(e.AllOptions()), len(a.AllOptions()))
 	} else {
-		for i, _ := range e.opts {
-			if e.opts[i].ID != a.opts[i].ID {
-				t.Errorf("Expected option ID %v, got %v", e.opts[i].ID, a.opts[i].ID)
+		for i, _ := range e.AllOptions() {
+			if e.AllOptions()[i].ID != a.AllOptions()[i].ID {
+				t.Errorf("Expected option ID %v, got %v", e.AllOptions()[i].ID, a.AllOptions()[i].ID)
 				continue
 			}
-			switch e.opts[i].Value.(type) {
+			switch e.AllOptions()[i].Value.(type) {
 			case []byte:
-				expected := e.opts[i].Value.([]byte)
-				actual := a.opts[i].Value.([]byte)
+				expected := e.AllOptions()[i].Value.([]byte)
+				actual := a.AllOptions()[i].Value.([]byte)
 				if !bytes.Equal(expected, actual) {
-					t.Errorf("Expected Option ID %v value %v, got %v", e.opts[i].ID, expected, actual)
+					t.Errorf("Expected Option ID %v value %v, got %v", e.AllOptions()[i].ID, expected, actual)
 				}
 			default:
-				if e.opts[i].Value != a.opts[i].Value {
-					t.Errorf("Expected Option ID %v value %v, got %v", e.opts[i].ID, e.opts[i].Value, a.opts[i].Value)
+				if e.AllOptions()[i].Value != a.AllOptions()[i].Value {
+					t.Errorf("Expected Option ID %v value %v, got %v", e.AllOptions()[i].ID, e.AllOptions()[i].Value, a.AllOptions()[i].Value)
 				}
 			}
 		}
@@ -99,8 +99,8 @@ func TestMessageConfirmable(t *testing.T) {
 		m   Message
 		exp bool
 	}{
-		{Message{Type: Confirmable}, true},
-		{Message{Type: NonConfirmable}, false},
+		{&DgramMessage{MessageBase{typ: Confirmable}}, true},
+		{&DgramMessage{MessageBase{typ: NonConfirmable}}, false},
 	}
 
 	for _, test := range tests {
@@ -112,7 +112,7 @@ func TestMessageConfirmable(t *testing.T) {
 }
 
 func TestMissingOption(t *testing.T) {
-	got := Message{}.Option(MaxAge)
+	got := (&DgramMessage{}).Option(MaxAge)
 	if got != nil {
 		t.Errorf("Expected nil, got %v", got)
 	}
@@ -163,10 +163,12 @@ func TestCodeString(t *testing.T) {
 }
 
 func TestEncodeMessageWithoutOptionsAndPayload(t *testing.T) {
-	req := Message{
-		Type:      Confirmable,
-		Code:      GET,
-		MessageID: 12345,
+	req := DgramMessage{
+		MessageBase{
+			typ:       Confirmable,
+			code:      GET,
+			messageID: 12345,
+		},
 	}
 
 	data, err := req.MarshalBinary()
@@ -182,10 +184,12 @@ func TestEncodeMessageWithoutOptionsAndPayload(t *testing.T) {
 }
 
 func TestEncodeMessageSmall(t *testing.T) {
-	req := Message{
-		Type:      Confirmable,
-		Code:      GET,
-		MessageID: 12345,
+	req := DgramMessage{
+		MessageBase{
+			typ:       Confirmable,
+			code:      GET,
+			messageID: 12345,
+		},
 	}
 
 	req.AddOption(ETag, []byte("weetag"))
@@ -207,11 +211,13 @@ func TestEncodeMessageSmall(t *testing.T) {
 }
 
 func TestEncodeMessageSmallWithPayload(t *testing.T) {
-	req := Message{
-		Type:      Confirmable,
-		Code:      GET,
-		MessageID: 12345,
-		Payload:   []byte("hi"),
+	req := DgramMessage{
+		MessageBase{
+			typ:       Confirmable,
+			code:      GET,
+			messageID: 12345,
+			payload:   []byte("hi"),
+		},
 	}
 
 	req.AddOption(ETag, []byte("weetag"))
@@ -247,7 +253,7 @@ func TestInvalidMessageParsing(t *testing.T) {
 	}
 
 	for _, data := range invalidPackets {
-		msg, err := ParseMessage(data)
+		msg, err := ParseDgramMessage(data)
 		if err == nil {
 			t.Errorf("Unexpected success parsing short message (%#v): %v", data, msg)
 		}
@@ -255,13 +261,15 @@ func TestInvalidMessageParsing(t *testing.T) {
 }
 
 func TestOptionsWithIllegalLengthAreIgnoredDuringParsing(t *testing.T) {
-	exp := Message{
-		Type:      Confirmable,
-		Code:      GET,
-		MessageID: 0xabcd,
-		Payload:   []byte{},
+	exp := &DgramMessage{
+		MessageBase{
+			typ:       Confirmable,
+			code:      GET,
+			messageID: 0xabcd,
+			payload:   []byte{},
+		},
 	}
-	msg, err := ParseMessage([]byte{0x40, 0x01, 0xab, 0xcd,
+	msg, err := ParseDgramMessage([]byte{0x40, 0x01, 0xab, 0xcd,
 		0x73, // URI-Port option (uint) with length 3 (valid lengths are 0-2)
 		0x11, 0x22, 0x33, 0xff})
 	if err != nil {
@@ -271,7 +279,7 @@ func TestOptionsWithIllegalLengthAreIgnoredDuringParsing(t *testing.T) {
 		t.Errorf("Expected\n%#v\ngot\n%#v", exp, msg)
 	}
 
-	msg, err = ParseMessage([]byte{0x40, 0x01, 0xab, 0xcd,
+	msg, err = ParseDgramMessage([]byte{0x40, 0x01, 0xab, 0xcd,
 		0xd5, 0x01, // Max-Age option (uint) with length 5 (valid lengths are 0-4)
 		0x11, 0x22, 0x33, 0x44, 0x55, 0xff})
 	if err != nil {
@@ -284,25 +292,25 @@ func TestOptionsWithIllegalLengthAreIgnoredDuringParsing(t *testing.T) {
 
 func TestDecodeMessageWithoutOptionsAndPayload(t *testing.T) {
 	input := []byte{0x40, 0x1, 0x30, 0x39}
-	msg, err := ParseMessage(input)
+	msg, err := ParseDgramMessage(input)
 	if err != nil {
 		t.Fatalf("Error parsing message: %v", err)
 	}
 
-	if msg.Type != Confirmable {
-		t.Errorf("Expected message type confirmable, got %v", msg.Type)
+	if msg.Type() != Confirmable {
+		t.Errorf("Expected message type confirmable, got %v", msg.Type())
 	}
-	if msg.Code != GET {
-		t.Errorf("Expected message code GET, got %v", msg.Code)
+	if msg.Code() != GET {
+		t.Errorf("Expected message code GET, got %v", msg.Code())
 	}
-	if msg.MessageID != 12345 {
-		t.Errorf("Expected message ID 12345, got %v", msg.MessageID)
+	if msg.MessageID() != 12345 {
+		t.Errorf("Expected message ID 12345, got %v", msg.MessageID())
 	}
-	if len(msg.Token) != 0 {
-		t.Errorf("Incorrect token: %q", msg.Token)
+	if len(msg.Token()) != 0 {
+		t.Errorf("Incorrect token: %q", msg.Token())
 	}
-	if len(msg.Payload) != 0 {
-		t.Errorf("Incorrect payload: %q", msg.Payload)
+	if len(msg.Payload()) != 0 {
+		t.Errorf("Incorrect payload: %q", msg.Payload())
 	}
 }
 
@@ -313,31 +321,33 @@ func TestDecodeMessageSmallWithPayload(t *testing.T) {
 		0xff, 'h', 'i',
 	}
 
-	msg, err := ParseMessage(input)
+	msg, err := ParseDgramMessage(input)
 	if err != nil {
 		t.Fatalf("Error parsing message: %v", err)
 	}
 
-	if msg.Type != Confirmable {
-		t.Errorf("Expected message type confirmable, got %v", msg.Type)
+	if msg.Type() != Confirmable {
+		t.Errorf("Expected message type confirmable, got %v", msg.Type())
 	}
-	if msg.Code != GET {
-		t.Errorf("Expected message code GET, got %v", msg.Code)
+	if msg.Code() != GET {
+		t.Errorf("Expected message code GET, got %v", msg.Code())
 	}
-	if msg.MessageID != 12345 {
-		t.Errorf("Expected message ID 12345, got %v", msg.MessageID)
+	if msg.MessageID() != 12345 {
+		t.Errorf("Expected message ID 12345, got %v", msg.MessageID())
 	}
 
-	if !bytes.Equal(msg.Payload, []byte("hi")) {
-		t.Errorf("Incorrect payload: %q", msg.Payload)
+	if !bytes.Equal(msg.Payload(), []byte("hi")) {
+		t.Errorf("Incorrect payload: %q", msg.Payload())
 	}
 }
 
 func TestEncodeMessageVerySmall(t *testing.T) {
-	req := Message{
-		Type:      Confirmable,
-		Code:      GET,
-		MessageID: 12345,
+	req := &DgramMessage{
+		MessageBase{
+			typ:       Confirmable,
+			code:      GET,
+			messageID: 12345,
+		},
 	}
 	req.SetPathString("x")
 
@@ -357,10 +367,12 @@ func TestEncodeMessageVerySmall(t *testing.T) {
 
 // Same as above, but with a leading slash
 func TestEncodeMessageVerySmall2(t *testing.T) {
-	req := Message{
-		Type:      Confirmable,
-		Code:      GET,
-		MessageID: 12345,
+	req := &DgramMessage{
+		MessageBase{
+			typ:       Confirmable,
+			code:      GET,
+			messageID: 12345,
+		},
 	}
 	req.SetPathString("/x")
 
@@ -386,7 +398,13 @@ func TestEncodeSeveral(t *testing.T) {
 			"f", "h", "g", "i", "j"},
 	}
 	for p, a := range tests {
-		m := &Message{Type: Confirmable, Code: GET, MessageID: 12345}
+		m := &DgramMessage{
+			MessageBase{
+				typ:       Confirmable,
+				code:      GET,
+				messageID: 12345,
+			},
+		}
 		m.SetPathString(p)
 		b, err := m.MarshalBinary()
 		if err != nil {
@@ -394,7 +412,7 @@ func TestEncodeSeveral(t *testing.T) {
 			t.Fail()
 			continue
 		}
-		m2, err := ParseMessage(b)
+		m2, err := ParseDgramMessage(b)
 		if err != nil {
 			t.Fatalf("Can't parse my own message at %#v: %v", p, err)
 		}
@@ -407,7 +425,13 @@ func TestEncodeSeveral(t *testing.T) {
 }
 
 func TestPathAsOption(t *testing.T) {
-	m := &Message{Type: Confirmable, Code: GET, MessageID: 12345}
+	m := &DgramMessage{
+		MessageBase{
+			typ:       Confirmable,
+			code:      GET,
+			messageID: 12345,
+		},
+	}
 	m.SetOption(LocationPath, []string{"a", "b"})
 	got, err := m.MarshalBinary()
 	if err != nil {
@@ -420,10 +444,12 @@ func TestPathAsOption(t *testing.T) {
 }
 
 func TestEncodePath14(t *testing.T) {
-	req := Message{
-		Type:      Confirmable,
-		Code:      GET,
-		MessageID: 12345,
+	req := DgramMessage{
+		MessageBase{
+			typ:       Confirmable,
+			code:      GET,
+			messageID: 12345,
+		},
 	}
 	req.SetPathString("123456789ABCDE")
 
@@ -444,10 +470,12 @@ func TestEncodePath14(t *testing.T) {
 }
 
 func TestEncodePath15(t *testing.T) {
-	req := Message{
-		Type:      Confirmable,
-		Code:      GET,
-		MessageID: 12345,
+	req := DgramMessage{
+		MessageBase{
+			typ:       Confirmable,
+			code:      GET,
+			messageID: 12345,
+		},
 	}
 	req.SetPathString("123456789ABCDEF")
 
@@ -468,10 +496,12 @@ func TestEncodePath15(t *testing.T) {
 }
 
 func TestEncodeLargePath(t *testing.T) {
-	req := Message{
-		Type:      Confirmable,
-		Code:      GET,
-		MessageID: 12345,
+	req := DgramMessage{
+		MessageBase{
+			typ:       Confirmable,
+			code:      GET,
+			messageID: 12345,
+		},
 	}
 	req.SetPathString("this_path_is_longer_than_fifteen_bytes")
 
@@ -508,18 +538,20 @@ func TestDecodeLargePath(t *testing.T) {
 		0x5f, 0x62, 0x79, 0x74, 0x65, 0x73,
 	}
 
-	req, err := ParseMessage(data)
+	req, err := ParseDgramMessage(data)
 	if err != nil {
 		t.Fatalf("Error parsing request: %v", err)
 	}
 
 	path := "this_path_is_longer_than_fifteen_bytes"
 
-	exp := Message{
-		Type:      Confirmable,
-		Code:      GET,
-		MessageID: 12345,
-		Payload:   []byte{},
+	exp := &DgramMessage{
+		MessageBase{
+			typ:       Confirmable,
+			code:      GET,
+			messageID: 12345,
+			payload:   []byte{},
+		},
 	}
 
 	exp.SetOption(URIPath, path)
@@ -536,16 +568,18 @@ func TestDecodeMessageSmaller(t *testing.T) {
 		0x65, 0x65, 0x74, 0x61, 0x67, 0xa1, 0x3,
 	}
 
-	req, err := ParseMessage(data)
+	req, err := ParseDgramMessage(data)
 	if err != nil {
 		t.Fatalf("Error parsing request: %v", err)
 	}
 
-	exp := Message{
-		Type:      Confirmable,
-		Code:      GET,
-		MessageID: 12345,
-		Payload:   []byte{},
+	exp := &DgramMessage{
+		MessageBase{
+			typ:       Confirmable,
+			code:      GET,
+			messageID: 12345,
+			payload:   []byte{},
+		},
 	}
 
 	exp.SetOption(ETag, []byte("weetag"))
@@ -622,30 +656,30 @@ func TestExample1(t *testing.T) {
 	input := append([]byte{0x40, 1, 0x7d, 0x34,
 		(11 << 4) | 11}, []byte("temperature")...)
 
-	msg, err := ParseMessage(input)
+	msg, err := ParseDgramMessage(input)
 	if err != nil {
 		t.Fatalf("Error parsing message: %v", err)
 	}
 
-	if msg.Type != Confirmable {
-		t.Errorf("Expected message type confirmable, got %v", msg.Type)
+	if msg.Type() != Confirmable {
+		t.Errorf("Expected message type confirmable, got %v", msg.Type())
 	}
-	if msg.Code != GET {
-		t.Errorf("Expected message code GET, got %v", msg.Code)
+	if msg.Code() != GET {
+		t.Errorf("Expected message code GET, got %v", msg.Code())
 	}
-	if msg.MessageID != 0x7d34 {
-		t.Errorf("Expected message ID 0x7d34, got 0x%x", msg.MessageID)
+	if msg.MessageID() != 0x7d34 {
+		t.Errorf("Expected message ID 0x7d34, got 0x%x", msg.MessageID())
 	}
 
 	if msg.Option(URIPath).(string) != "temperature" {
 		t.Errorf("Incorrect uri path: %q", msg.Option(URIPath))
 	}
 
-	if len(msg.Token) > 0 {
-		t.Errorf("Incorrect token: %x", msg.Token)
+	if len(msg.Token()) > 0 {
+		t.Errorf("Incorrect token: %x", msg.Token())
 	}
-	if len(msg.Payload) > 0 {
-		t.Errorf("Incorrect payload: %q", msg.Payload)
+	if len(msg.Payload()) > 0 {
+		t.Errorf("Incorrect payload: %q", msg.Payload())
 	}
 }
 
@@ -662,26 +696,26 @@ func TestExample1Res(t *testing.T) {
 	input := append([]byte{0x60, 69, 0x7d, 0x34, 0xff},
 		[]byte("22.3 C")...)
 
-	msg, err := ParseMessage(input)
+	msg, err := ParseDgramMessage(input)
 	if err != nil {
 		t.Fatalf("Error parsing message: %v", err)
 	}
 
-	if msg.Type != Acknowledgement {
-		t.Errorf("Expected message type confirmable, got %v", msg.Type)
+	if msg.Type() != Acknowledgement {
+		t.Errorf("Expected message type confirmable, got %v", msg.Type())
 	}
-	if msg.Code != Content {
-		t.Errorf("Expected message code Content, got %v", msg.Code)
+	if msg.Code() != Content {
+		t.Errorf("Expected message code Content, got %v", msg.Code())
 	}
-	if msg.MessageID != 0x7d34 {
-		t.Errorf("Expected message ID 0x7d34, got 0x%x", msg.MessageID)
+	if msg.MessageID() != 0x7d34 {
+		t.Errorf("Expected message ID 0x7d34, got 0x%x", msg.MessageID())
 	}
 
-	if len(msg.Token) > 0 {
-		t.Errorf("Incorrect token: %x", msg.Token)
+	if len(msg.Token()) > 0 {
+		t.Errorf("Incorrect token: %x", msg.Token())
 	}
-	if !bytes.Equal(msg.Payload, []byte("22.3 C")) {
-		t.Errorf("Incorrect payload: %q", msg.Payload)
+	if !bytes.Equal(msg.Payload(), []byte("22.3 C")) {
+		t.Errorf("Incorrect payload: %q", msg.Payload())
 	}
 }
 
@@ -692,17 +726,17 @@ func TestIssue15(t *testing.T) {
 		0x72, 0x6b, 0x2f, 0x63, 0x63, 0x33, 0x30, 0x30, 0x30, 0x2d,
 		0x70, 0x61, 0x74, 0x63, 0x68, 0x2d, 0x76, 0x65, 0x72, 0x73,
 		0x69, 0x6f, 0x6e, 0xff, 0x31, 0x2e, 0x32, 0x38}
-	msg, err := ParseMessage(input)
+	msg, err := ParseDgramMessage(input)
 	if err != nil {
 		t.Fatalf("Error parsing message: %v", err)
 	}
 
-	if !bytes.Equal(msg.Token, []byte{1, 2, 3}) {
-		t.Errorf("Expected token = [1, 2, 3], got %v", msg.Token)
+	if !bytes.Equal(msg.Token(), []byte{1, 2, 3}) {
+		t.Errorf("Expected token = [1, 2, 3], got %v", msg.Token())
 	}
 
-	if !bytes.Equal(msg.Payload, []byte{0x31, 0x2e, 0x32, 0x38}) {
-		t.Errorf("Expected payload = {0x31, 0x2e, 0x32, 0x38}, got %v", msg.Payload)
+	if !bytes.Equal(msg.Payload(), []byte{0x31, 0x2e, 0x32, 0x38}) {
+		t.Errorf("Expected payload = {0x31, 0x2e, 0x32, 0x38}, got %v", msg.Payload())
 	}
 
 	pathExp := "E/spark/cc3000-patch-version"
@@ -715,7 +749,7 @@ func TestErrorOptionMarker(t *testing.T) {
 	input := []byte{0x53, 0x2, 0x7a, 0x23,
 		0x1, 0x2, 0x3, 0xbf, 0x01, 0x02, 0x03, 0x04, 0x05, 0x6, 0x7, 0x8, 0x9,
 		0xa, 0xb, 0xc, 0xe, 0xf, 0x10}
-	msg, err := ParseMessage(input)
+	msg, err := ParseDgramMessage(input)
 	if err == nil {
 		t.Errorf("Unexpected success parsing malformed option: %v", msg)
 	}
@@ -726,7 +760,7 @@ func TestDecodeContentFormatOptionToMediaType(t *testing.T) {
 		0x40, 0x1, 0x30, 0x39, 0xc1, 0x32, 0x51, 0x29,
 	}
 
-	parsedMsg, err := ParseMessage(data)
+	parsedMsg, err := ParseDgramMessage(data)
 	if err != nil {
 		t.Fatalf("Error parsing request: %v", err)
 	}
@@ -770,12 +804,14 @@ func TestDecodeContentFormatOptionToMediaTypeLarge(t *testing.T) {
 }
 
 func TestEncodeMessageWithAllOptions(t *testing.T) {
-	req := Message{
-		Type:      Confirmable,
-		Code:      GET,
-		MessageID: 12345,
-		Token:     []byte("TOKEN"),
-		Payload:   []byte("PAYLOAD"),
+	req := &DgramMessage{
+		MessageBase{
+			typ:       Confirmable,
+			code:      GET,
+			messageID: 12345,
+			token:     []byte("TOKEN"),
+			payload:   []byte("PAYLOAD"),
+		},
 	}
 
 	req.AddOption(IfMatch, []byte("IFMATCH"))
@@ -800,7 +836,7 @@ func TestEncodeMessageWithAllOptions(t *testing.T) {
 		t.Fatalf("Error encoding request: %v", err)
 	}
 
-	parsedMsg, err := ParseMessage(data)
+	parsedMsg, err := ParseDgramMessage(data)
 	if err != nil {
 		t.Fatalf("Error parsing binary packet: %v", err)
 	}
