@@ -7,10 +7,10 @@ import (
 	"github.com/dustin/go-coap"
 )
 
-func handleA(l *net.UDPConn, a *net.UDPAddr, m *coap.Message) *coap.Message {
+func handleA(l *net.UDPConn, a *net.UDPAddr, m *coap.MessageBase) *coap.MessageBase {
 	log.Printf("Got message in handleA: path=%q: %#v from %v", m.Path(), m, a)
 	if m.IsConfirmable() {
-		res := &coap.Message{
+		res := &coap.MessageBase{
 			Type:      coap.Acknowledgement,
 			Code:      coap.Content,
 			MessageID: m.MessageID,
@@ -25,10 +25,10 @@ func handleA(l *net.UDPConn, a *net.UDPAddr, m *coap.Message) *coap.Message {
 	return nil
 }
 
-func handleB(l *net.UDPConn, a *net.UDPAddr, m *coap.Message) *coap.Message {
+func handleB(l *net.UDPConn, a *net.UDPAddr, m *coap.MessageBase) *coap.MessageBase {
 	log.Printf("Got message in handleB: path=%q: %#v from %v", m.Path(), m, a)
 	if m.IsConfirmable() {
-		res := &coap.Message{
+		res := &coap.MessageBase{
 			Type:      coap.Acknowledgement,
 			Code:      coap.Content,
 			MessageID: m.MessageID,

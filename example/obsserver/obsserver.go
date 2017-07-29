@@ -9,11 +9,11 @@ import (
 	"github.com/dustin/go-coap"
 )
 
-func periodicTransmitter(l *net.UDPConn, a *net.UDPAddr, m *coap.Message) {
+func periodicTransmitter(l *net.UDPConn, a *net.UDPAddr, m *coap.MessageBase) {
 	subded := time.Now()
 
 	for {
-		msg := coap.Message{
+		msg := coap.MessageBase{
 			Type:      coap.Acknowledgement,
 			Code:      coap.Content,
 			MessageID: m.MessageID,
@@ -36,7 +36,7 @@ func periodicTransmitter(l *net.UDPConn, a *net.UDPAddr, m *coap.Message) {
 
 func main() {
 	log.Fatal(coap.ListenAndServe("udp", ":5683",
-		coap.FuncHandler(func(l *net.UDPConn, a *net.UDPAddr, m *coap.Message) *coap.Message {
+		coap.FuncHandler(func(l *net.UDPConn, a *net.UDPAddr, m *coap.MessageBase) *coap.MessageBase {
 			log.Printf("Got message path=%q: %#v from %v", m.Path(), m, a)
 			if m.Code == coap.GET && m.Option(coap.Observe) != nil {
 				if value, ok := m.Option(coap.Observe).([]uint8); ok &&

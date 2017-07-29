@@ -10,16 +10,16 @@ func TestPathMatching(t *testing.T) {
 
 	msgs := map[string]int{}
 
-	m.HandleFunc("/a", func(l *net.UDPConn, a *net.UDPAddr, m *Message) *Message {
+	m.HandleFunc("/a", func(l *net.UDPConn, a *net.UDPAddr, m Message) Message {
 		msgs["a"]++
 		return nil
 	})
-	m.HandleFunc("/b", func(l *net.UDPConn, a *net.UDPAddr, m *Message) *Message {
+	m.HandleFunc("/b", func(l *net.UDPConn, a *net.UDPAddr, m Message) Message {
 		msgs["b"]++
 		return nil
 	})
 
-	msg := &Message{}
+	msg := &DgramMessage{}
 	msg.SetPathString("/a")
 	m.ServeCOAP(nil, nil, msg)
 	msg.SetPathString("/a")
@@ -28,7 +28,7 @@ func TestPathMatching(t *testing.T) {
 	m.ServeCOAP(nil, nil, msg)
 	msg.SetPathString("/c")
 	m.ServeCOAP(nil, nil, msg)
-	msg.Type = NonConfirmable
+	msg.MessageBase.typ = NonConfirmable
 	msg.SetPathString("/c")
 	m.ServeCOAP(nil, nil, msg)
 
