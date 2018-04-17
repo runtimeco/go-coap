@@ -12,7 +12,7 @@ func startUDPLisenter(t *testing.T) (*net.UDPConn, string) {
 	}
 	udpListener, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
-		t.Fatal("Can't listen on UDP")
+		t.Fatal("Can't listen on UDP ", err)
 	}
 	coapServerAddr := udpListener.LocalAddr().String()
 	return udpListener, coapServerAddr
@@ -53,14 +53,14 @@ func TestServeWithAckResponse(t *testing.T) {
 	res.SetOption(ContentFormat, TextPlain)
 	res.SetPath(req.Path())
 
-	handler := FuncHandler(func(l *net.UDPConn, a *net.UDPAddr, m Message) Message {
+	handler := FuncHandler(func(c *Conn, m Message) Message {
 		assertEqualMessages(t, req, m)
 		return res
 	})
 
 	udpListener, coapServerAddr := startUDPLisenter(t)
 	defer udpListener.Close()
-	go Serve(udpListener, handler)
+	go Serve(&Conn{conn: udpListener}, handler)
 
 	m := dialAndSend(t, coapServerAddr, req)
 	if m == nil {
@@ -80,14 +80,14 @@ func TestServeWithoutAckResponse(t *testing.T) {
 	}
 	req.SetOption(ContentFormat, AppOctets)
 
-	handler := FuncHandler(func(l *net.UDPConn, a *net.UDPAddr, m Message) Message {
+	handler := FuncHandler(func(c *Conn, m Message) Message {
 		assertEqualMessages(t, req, m)
 		return nil
 	})
 
 	udpListener, coapServerAddr := startUDPLisenter(t)
 	defer udpListener.Close()
-	go Serve(udpListener, handler)
+	go Serve(&Conn{conn: udpListener}, handler)
 
 	m := dialAndSend(t, coapServerAddr, req)
 	if m != nil {
