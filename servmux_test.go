@@ -1,7 +1,6 @@
 package coap
 
 import (
-	"net"
 	"testing"
 )
 
@@ -9,28 +8,37 @@ func TestPathMatching(t *testing.T) {
 	m := NewServeMux()
 
 	msgs := map[string]int{}
-
-	m.HandleFunc("/a", func(l *net.UDPConn, a *net.UDPAddr, m Message) Message {
+	//using nil for network type because no transport is being used in this test
+	m.HandleFunc("", "/a", func(c *Conn, m Message) Message {
 		msgs["a"]++
+		t.Log("get a request on /a ", string(m.Payload()))
 		return nil
 	})
-	m.HandleFunc("/b", func(l *net.UDPConn, a *net.UDPAddr, m Message) Message {
+	m.HandleFunc("", "/b", func(c *Conn, m Message) Message {
 		msgs["b"]++
+		t.Log("get a request on /b ", string(m.Payload()))
 		return nil
 	})
 
 	msg := &DgramMessage{}
+	cTcp := &Conn{Net: "tcp"} //it's easier to set Conn.Net and not use it than it is to explicitly accept connections without a stated transport type
+	cUdp := &Conn{Net: "udp"}
 	msg.SetPathString("/a")
-	m.ServeCOAP(nil, nil, msg)
+	msg.SetPayload([]byte("hi a1"))
+	m.ServeCOAP(cTcp, msg)
 	msg.SetPathString("/a")
-	m.ServeCOAP(nil, nil, msg)
+	msg.SetPayload([]byte("hi a2"))
+	m.ServeCOAP(cTcp, msg)
 	msg.SetPathString("/b")
-	m.ServeCOAP(nil, nil, msg)
+	msg.SetPayload([]byte("hi b1"))
+	m.ServeCOAP(cUdp, msg)
 	msg.SetPathString("/c")
-	m.ServeCOAP(nil, nil, msg)
+	msg.SetPayload([]byte("hi c"))
+	m.ServeCOAP(cUdp, msg)
 	msg.MessageBase.typ = NonConfirmable
 	msg.SetPathString("/c")
-	m.ServeCOAP(nil, nil, msg)
+	msg.SetPayload([]byte("hi c"))
+	m.ServeCOAP(cTcp, msg)
 
 	if msgs["a"] != 2 {
 		t.Errorf("Expected 2 messages for /a, got %v", msgs["a"])

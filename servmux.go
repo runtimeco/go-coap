@@ -1,9 +1,5 @@
 package coap
 
-import (
-	"net"
-)
-
 // ServeMux provides mappings from a common endpoint to handlers by
 // request path.
 type ServeMux struct {
@@ -13,6 +9,7 @@ type ServeMux struct {
 type muxEntry struct {
 	h       Handler
 	pattern string
+	network string
 }
 
 // NewServeMux creates a new ServeMux.
@@ -33,10 +30,11 @@ func pathMatch(pattern, path string) bool {
 
 // Find a handler on a handler map given a path string
 // Most-specific (longest) pattern wins
-func (mux *ServeMux) match(path string) (h Handler, pattern string) {
+func (mux *ServeMux) match(path, network string) (h Handler, pattern string) {
 	var n = 0
 	for k, v := range mux.m {
-		if !pathMatch(k, path) {
+		net := mux.m[path].network
+		if !pathMatch(k, path) && net != network {
 			continue
 		}
 		if h == nil || len(k) > n {
@@ -48,7 +46,7 @@ func (mux *ServeMux) match(path string) (h Handler, pattern string) {
 	return
 }
 
-func notFoundHandler(l *net.UDPConn, a *net.UDPAddr, m Message) Message {
+func notFoundHandler(c *Conn, m Message) Message {
 	if m.IsConfirmable() {
 		return &DgramMessage{
 			MessageBase{
@@ -64,33 +62,39 @@ var _ = Handler(&ServeMux{})
 
 // ServeCOAP handles a single COAP message.  The message arrives from
 // the given listener having originated from the given UDPAddr.
-func (mux *ServeMux) ServeCOAP(l *net.UDPConn, a *net.UDPAddr, m Message) Message {
-	h, _ := mux.match(m.PathString())
+//WARNING I SHOULD PROBABLY HANDLE ERRORS FOR Conn.Network()
+func (mux *ServeMux) ServeCOAP(c *Conn, m Message) Message {
+	n, _ := c.Network()
+	h, _ := mux.match(m.PathString(), n)
 	if h == nil {
 		h, _ = funcHandler(notFoundHandler), ""
 	}
 	// TODO:  Rewrite path?
-	return h.ServeCOAP(l, a, m)
+	return h.ServeCOAP(c, m)
 }
 
 // Handle configures a handler for the given path.
-func (mux *ServeMux) Handle(pattern string, handler Handler) {
+func (mux *ServeMux) Handle(n string, pattern string, handler Handler) {
 	for pattern != "" && pattern[0] == '/' {
 		pattern = pattern[1:]
 	}
 
 	if pattern == "" {
-		panic("http: invalid pattern " + pattern)
+		panic("coap: invalid pattern " + pattern)
 	}
 	if handler == nil {
-		panic("http: nil handler")
+		panic("coap: nil handler")
 	}
-
-	mux.m[pattern] = muxEntry{h: handler, pattern: pattern}
+	if _, ok := mux.m[pattern]; ok {
+		if mux.m[pattern].network == n {
+			panic("coap: multiple registration for " + pattern + " on transport: " + n)
+		}
+	}
+	mux.m[pattern] = muxEntry{h: handler, pattern: pattern, network: n}
 }
 
 // HandleFunc configures a handler for the given path.
-func (mux *ServeMux) HandleFunc(pattern string,
-	f func(l *net.UDPConn, a *net.UDPAddr, m Message) Message) {
-	mux.Handle(pattern, FuncHandler(f))
+func (mux *ServeMux) HandleFunc(network, pattern string,
+	f func(c *Conn, m Message) Message) {
+	mux.Handle(network, pattern, FuncHandler(f))
 }
